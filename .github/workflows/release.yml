@@ -134,10 +134,25 @@ jobs:
     - name: Test binary
       run: |
         if [ -f "bin/release/router-switch" ]; then
-          echo "Binary found, testing..."
-          ./bin/release/router-switch --version
-          ./bin/release/router-switch --help
-          echo "Binary test passed"
+          echo "Binary found"
+          ls -la bin/release/router-switch
+          file bin/release/router-switch
+
+          # Only test if binary matches the host architecture
+          if [[ "${{ matrix.target }}" == *"x86-64"* && "$(uname -m)" == "x86_64" ]]; then
+            echo "Testing x86_64 binary on x86_64 host..."
+            ./bin/release/router-switch --version
+            ./bin/release/router-switch --help > /dev/null
+            echo "Binary test passed"
+          elif [[ "${{ matrix.target }}" == *"arm64"* && "$(uname -m)" == "aarch64" ]]; then
+            echo "Testing ARM64 binary on ARM64 host..."
+            ./bin/release/router-switch --version
+            ./bin/release/router-switch --help > /dev/null
+            echo "Binary test passed"
+          else
+            echo "Cross-compiled binary detected - skipping execution test"
+            echo "Binary built successfully for ${{ matrix.target }}"
+          fi
         else
           echo "Binary not found!"
           ls -la bin/ || true
