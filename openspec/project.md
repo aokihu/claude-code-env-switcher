@@ -4,21 +4,24 @@
 使用`routerswitch`为`Claude Code`实现切换AI供应商和模型的功能,用户可以通过设置配置文件自定义AI供应商和模型
 
 ## Tech Stack
-- Typescript 5.0
-- Bun 1.3
+- C99 Standard
+- POSIX setenv/unsetenv functions
+- GCC compiler
 
 ## Project Conventions
 
 ### Code Style
-- 只使用`bun`内置的功能实现,或者`nodejs`兼容的内置功能,不使用任何第三方的库
 
 ### Architecture Patterns
 
-- `dist/` 目录中存放的是编译后的可执行文件
+- `router-switch` 是编译后的可执行文件
 - `src/` 目录中是程序源代码
-- `src/parse_argv.ts` 是解析命令行参数的源文件
-- `src/clear_env.ts` 是清理环境变量的源文件
-- `src/set_env.ts` 是设置环境变量的源文件
+- `src/main.c` 是主程序入口
+- `src/cli.c` 是解析命令行参数的源文件
+- `src/config.c` 是配置管理源文件
+- `src/env_commands.c` 是环境变量操作的源文件
+- `src/json_parser.c` 是JSON解析的源文件
+- `src/router-switch.h` 是头文件，包含所有函数声明和数据结构
 
 ### Testing Strategy
 [Explain your testing approach and requirements]
@@ -69,17 +72,25 @@
 - *models* 的数组长度如果为*0*,那么就不用设置模型的环境变量
 - *env* 是用户设定的其他的环境变量,**key**就是环境变量名,**value**就是环境变量的值
 
-### 设置环境变量的流程
+### 设置环境变量的流程 (v2.0)
 
 1. 从环境变量中读取*ROUTERSWITCH_CURRENT_PROVIDER*
-2. 根据当前的AI供应商,清除对应的环境变量,包括*env*中的环境变量
-3. 根据命令行参数设置AI供应商和模型
-  3.1 *base_url* 转化成环境变量 *ANTHROPIC_BASE_URL*
-  3.2 *api_key* 转换成环境量 *ANTHROPIC_AUTH_TOKEN*
-  3.3 如果*models*数组是空, 则不设置*ANTHROPIC_MODEL*
-  3.4 如果*models*数组不为空, 并且用户没有设置模型, 则*models*数组中第一个模型设置为*ANTHROPIC_MODEL*, 如果用户设置了模型, 并且与*models*中的模型匹配则设置为用户指定的模型
-  3.5 *env* 存在并且不为空的情况下, 直接按照**key**:**value**的形式设置环境变量
-4. 更新环境变量*ROUTERSWITCH_CURRENT_PROVIDER*,设置为当前用户设定的AI供应商
+2. 根据当前的AI供应商, 使用`unsetenv()`清除对应的环境变量,包括*env*中的环境变量
+3. 根据命令行参数验证AI供应商和模型
+4. 使用`setenv()`直接设置新的AI供应商和模型环境变量
+  4.1 *base_url* 转化成环境变量 *ANTHROPIC_BASE_URL*
+  4.2 *api_key* 转换成环境量 *ANTHROPIC_AUTH_TOKEN*
+  4.3 如果*models*数组是空, 则不设置*ANTHROPIC_MODEL*
+  4.4 如果*models*数组不为空, 并且用户没有设置模型, 则*models*数组中第一个模型设置为*ANTHROPIC_MODEL*, 如果用户设置了模型, 并且与*models*中的模型匹配则设置为用户指定的模型
+  4.5 *env* 存在并且不为空的情况下, 直接按照**key**:**value**的形式设置环境变量
+5. 使用`setenv()`更新环境变量*ROUTERSWITCH_CURRENT_PROVIDER*,设置为当前用户设定的AI供应商
+6. 输出成功/失败消息给用户, 不再输出shell命令
+
+### 重要变更 (v2.0)
+- **破坏性变更**: 不再输出shell命令, 直接使用`setenv()`/`unsetenv()`设置环境变量
+- 用户使用方式从`eval $(router-switch ...)`改为`router-switch ...`
+- 环境变量在子进程中继承, 但不影响父shell环境
+- 提供详细的操作反馈信息
 
 ## Important Constraints
 [List any technical, business, or regulatory constraints]

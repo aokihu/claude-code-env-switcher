@@ -1,0 +1,13 @@
+{
+  "providers": {
+    "test-provider": {
+      "description": "Test provider for custom config testing",
+      "base_url": "https://api.test-provider.com/v1",
+      "api_key": "test-api-key-12345",
+      "models": ["test-model-1", "test-model-2"],
+      "env": {
+        "TEST_VAR": "test-value"
+      }
+    }
+  }
+}

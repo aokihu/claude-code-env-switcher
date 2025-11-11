@@ -1,8 +1,4 @@
-# cli-interface Specification
-
-## Purpose
-TBD - created by archiving change add-cli-args. Update Purpose after archive.
-## Requirements
+## MODIFIED Requirements
 ### Requirement: Command-line Interface
 The CLI SHALL provide command-line argument parsing for AI provider and model configuration.
 
@@ -61,6 +57,7 @@ The CLI SHALL support model selection for the specified provider.
 - **THEN** the tool displays an error message to stderr
 - **AND** exits with non-zero status code
 
+## ADDED Requirements
 ### Requirement: Configuration File Support
 The CLI SHALL support loading configuration from custom file paths.
 
@@ -83,4 +80,3 @@ The CLI SHALL support loading configuration from custom file paths.
 - **WHEN** user specifies a configuration file with invalid JSON format
 - **THEN** the tool displays an error message to stderr
 - **AND** exits with non-zero status code
-

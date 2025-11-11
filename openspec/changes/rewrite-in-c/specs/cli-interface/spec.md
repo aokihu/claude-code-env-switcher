@@ -1,10 +1,6 @@
-# cli-interface Specification
-
-## Purpose
-TBD - created by archiving change add-cli-args. Update Purpose after archive.
-## Requirements
+## MODIFIED Requirements
 ### Requirement: Command-line Interface
-The CLI SHALL provide command-line argument parsing for AI provider and model configuration.
+The CLI SHALL provide command-line argument parsing for AI provider and model configuration using C language implementation.
 
 #### Scenario: User specifies provider and model
 - **WHEN** user runs `router-switch --provider openai --model gpt-4`
@@ -36,7 +32,7 @@ The CLI SHALL provide command-line argument parsing for AI provider and model co
 - **THEN** the tool displays usage information including provider, model, and config options
 
 ### Requirement: Provider Configuration
-The CLI SHALL support provider selection from available configuration options.
+The CLI SHALL support provider selection from available configuration options using C language implementation.
 
 #### Scenario: Valid provider specified
 - **WHEN** user specifies a valid provider (e.g., `--provider openai`)
@@ -49,7 +45,7 @@ The CLI SHALL support provider selection from available configuration options.
 - **AND** exits with non-zero status code
 
 ### Requirement: Model Configuration
-The CLI SHALL support model selection for the specified provider.
+The CLI SHALL support model selection for the specified provider using C language implementation.
 
 #### Scenario: Valid model specified
 - **WHEN** user specifies a valid model for the selected provider
@@ -62,7 +58,7 @@ The CLI SHALL support model selection for the specified provider.
 - **AND** exits with non-zero status code
 
 ### Requirement: Configuration File Support
-The CLI SHALL support loading configuration from custom file paths.
+The CLI SHALL support loading configuration from custom file paths using C language implementation.
 
 #### Scenario: Default configuration file
 - **WHEN** user does not specify a configuration file
@@ -83,4 +79,3 @@ The CLI SHALL support loading configuration from custom file paths.
 - **WHEN** user specifies a configuration file with invalid JSON format
 - **THEN** the tool displays an error message to stderr
 - **AND** exits with non-zero status code
-

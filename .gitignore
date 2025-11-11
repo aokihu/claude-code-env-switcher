@@ -1,42 +1,51 @@
-# Dependencies
-node_modules/
-.pnpm-store/
-.yarn/
-.bun/
+# C build artifacts
+*.o
+*.obj
+*.exe
+*.out
+*.app
+debug-router-switch
+debug-router-switch.dSYM
 
-# Build outputs
-dist/
+# Build directories
+obj/
 build/
-*.tsbuildinfo
+dist/
 
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
+# Binary directories (keep structure, ignore binaries)
+bin/debug/router-switch
+bin/release/router-switch
 
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-.pnpm-debug.log*
+# Debug symbols
+*.dSYM/
+*.su
+*.idb
+*.pdb
 
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Dependency files
+*.d
+*.dep
 
-# IDE and editor files
+# Library files
+*.a
+*.so
+*.dylib
+*.lib
+*.dll
+
+# Core dump files
+core
+core.*
+*.stackdump
+
+# Editor and IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.orig
+*.rej
 
 # OS generated files
 .DS_Store
@@ -47,172 +56,40 @@ lerna-debug.log*
 ehthumbs.db
 Thumbs.db
 
-# Bun
-.bun.lockb
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Log files
+*.log
+logs/
 
 # Temporary files
 *.tmp
 *.temp
-
-# Coverage directory used by tools like istanbul
-coverage/
-*.lcov
-
-# nyc test coverage
-.nyc_output
-
-# Dependency directories
-jspm_packages/
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# Next.js build output
-.next
-
-# Nuxt.js build / generate output
-.nuxt
-dist
-
-# Gatsby files
-.cache/
-# Comment in the public line in if your project uses Gatsby and *not* Next.js
-# https://nextjs.org/blog/next-9-1#public-directory-support
-# public
-
-# Storybook build outputs
-.out
-.storybook-out
-storybook-static
-
-# Temporary folders
 tmp/
 temp/
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Local configuration files
-.local
-
-# Lock files (keep only one)
-# package-lock.json
-# yarn.lock
-# pnpm-lock.yaml
-
-# TypeScript cache
-*.tsbuildinfo
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# Next.js build output
-.next
-
-# Nuxt.js build / generate output
-.nuxt
-dist
-
-# Gatsby files
-.cache/
-# Comment in the public line in if your project uses Gatsby and *not* Next.js
-# https://nextjs.org/blog/next-9-1#public-directory-support
-# public
-
-# Storybook build outputs
-.out
-.storybook-out
-storybook-static
-
-# Temporary folders
-tmp/
-temp/
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Local configuration files
-.local
-
-# Lock files (keep only one)
-# package-lock.json
-# yarn.lock
-# pnpm-lock.yaml
-
-# Bun lock file (keep this)
-# !.bun.lockb
 
 # Test coverage
 coverage/
-
-# CLI binary (if you build one)
-router-switch
-
-# Development files
-*.local
-*.dev
+*.lcov
 
 # Cache directories
 .cache/
 .parcel-cache/
 
-# Config files
+# Local configuration files
+.local
+*.local
+*.dev
+
+# Make backup files
+Makefile.bak
+
+# Configuration files with sensitive data
+# config.json (uncomment if you want to ignore config files)
+# *.config
 config.json
