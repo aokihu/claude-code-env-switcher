@@ -63,7 +63,7 @@ router-switch --help
 $ router-switch --provider deepseek --model deepseek-chat --verbose
 Successfully set environment variables:
   Set ANTHROPIC_BASE_URL to https://api.deepseek.com/anthropic
-  Set ANTHROPIC_AUTH_TOKEN to sk-035c8441b14b4ef496f48c5a7415e85a
+  Set ANTHROPIC_AUTH_TOKEN to sk-xxx-xxxx-xxxx-xxxx-xxxx
   Set ANTHROPIC_MODEL to deepseek-chat
   Set ANTHROPIC_DEFAULT_SONNET_MODEL to deepseek-chat
   Set ANTHROPIC_DEFAULT_OPUS_MODEL to deepseek-reasoner
@@ -112,12 +112,19 @@ Create a `config.json` file in the same directory as the binary:
 ### Configuration Fields
 
 - `providers`: Object containing all available providers
-- `[provider-name]`: Key used with `--provider` flag
+- `[provider-name]`: Key used with `🔒` flag
 - `description`: Human-readable description
 - `base_url`: API endpoint URL
-- `api_key`: Authentication key
+- `api_key`: Authentication key (⚠️ Keep secure!)
 - `models`: Array of available models (empty = use Claude Code defaults)
 - `env`: Additional environment variables to set
+
+### 🔒 Security Notes
+
+- Never commit real API keys to version control
+- Use environment variables or secure configuration management
+- Replace `"your-api-key"` with your actual keys in the config file
+- The example shows obscured keys for demonstration purposes only
 
 ## Environment Variables Set
 
@@ -175,8 +182,9 @@ Options:
   -p, --provider <provider>  Specify AI provider from config.json
   -m, --model <model>        Specify AI model for the provider
   -c, --config <path>        Specify custom configuration file path
+  -v, --verbose              Show detailed output (default: silent)
+  -V, --version              Display version information
   -h, --help                 Display this help message
-  -v, --version              Display version information
 ```
 
 ## Building
