@@ -10,20 +10,42 @@ SOURCES = $(wildcard $(SRCDIR)/*.c)
 # Default configuration
 BUILD_TYPE ?= release
 
+# Cross-compilation support (override from environment)
+TARGET_OS ?= $(shell uname -s | tr '[:upper:]' '[:lower:]')
+TARGET_ARCH ?= $(shell uname -m | sed 's/x86_64/x86_64/')
+
 # Build configurations
 ifeq ($(BUILD_TYPE),debug)
     OBJDIR = obj/debug
     BINDIR_TARGET = $(BINDIR)/debug
-    CFLAGS = -Wall -Wextra -std=c99 -g -DDEBUG -O0
+    BASE_CFLAGS = -Wall -Wextra -std=c99 -g -DDEBUG -O0
     STRIP_CMD = @echo "Debug build - keeping symbols"
 else ifeq ($(BUILD_TYPE),release)
     OBJDIR = obj/release
     BINDIR_TARGET = $(BINDIR)/release
-    CFLAGS = -Wall -Wextra -std=c99 -O3 -DNDEBUG -flto -march=native -mtune=native
+    BASE_CFLAGS = -Wall -Wextra -std=c99 -O3 -DNDEBUG -flto
     STRIP_CMD = strip $(BINDIR_TARGET)/$(TARGET)
 else
     $(error Invalid BUILD_TYPE. Use 'debug' or 'release')
 endif
+
+# Set architecture-specific flags
+ifeq ($(TARGET_ARCH),x86_64)
+    ifeq ($(TARGET_OS),linux)
+        ARCH_FLAGS = -march=x86-64 -mtune=generic
+    else ifeq ($(TARGET_OS),darwin)
+        ARCH_FLAGS = -target x86_64-apple-macos10.15
+    endif
+else ifeq ($(TARGET_ARCH),arm64)
+    ifeq ($(TARGET_OS),linux)
+        ARCH_FLAGS =
+    else ifeq ($(TARGET_OS),darwin)
+        ARCH_FLAGS = -target arm64-apple-macos11
+    endif
+endif
+
+# Final CFLAGS
+CFLAGS ?= $(BASE_CFLAGS) $(ARCH_FLAGS)
 
 OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
 PREFIX = /usr/local
@@ -112,19 +134,70 @@ test-all: debug release
 	@echo "Release version: PASSED"
 	@echo "All tests passed!"
 
-# Build for different platforms
+# Cross-compilation targets
+linux-x86_64:
+	$(MAKE) release CC=gcc TARGET_OS=linux TARGET_ARCH=x86_64
+	@echo "Built Linux x86_64 release"
+
+linux-arm64:
+	$(MAKE) release CC=aarch64-linux-gnu-gcc TARGET_OS=linux TARGET_ARCH=arm64 \
+		CFLAGS="$(BASE_CFLAGS) -static"
+	@echo "Built Linux ARM64 release"
+
+darwin-x86_64:
+	$(MAKE) release CC=clang TARGET_OS=darwin TARGET_ARCH=x86_64
+	@echo "Built macOS x86_64 release"
+
+darwin-arm64:
+	$(MAKE) release CC=clang TARGET_OS=darwin TARGET_ARCH=arm64
+	@echo "Built macOS ARM64 release"
+
+# Legacy platform targets (for backward compatibility)
 linux-release:
-	$(MAKE) release CC=gcc CFLAGS="$(CFLAGS) -DPLATFORM_LINUX"
+	$(MAKE) linux-x86_64
 	@echo "Built release for Linux"
 
 macos-release:
-	$(MAKE) release CC=clang CFLAGS="$(CFLAGS) -DPLATFORM_MACOS"
+	$(MAKE) darwin-x86_64
 	@echo "Built release for macOS"
 
 # Static build for distribution
 static-release: CFLAGS += -static
 static-release: release
 	@echo "Built static release binary"
+
+# Packaging and validation targets
+PACKAGE_NAME ?= $(TARGET)
+
+package: $(BINDIR_TARGET)/$(TARGET)
+	@mkdir -p dist
+	@cp $(BINDIR_TARGET)/$(TARGET) dist/$(PACKAGE_NAME)
+	@chmod +x dist/$(PACKAGE_NAME)
+	@echo "Packaged: dist/$(PACKAGE_NAME)"
+
+package-with-checksum: package
+	@cd dist && sha256sum $(PACKAGE_NAME) > $(PACKAGE_NAME).sha256
+	@echo "Checksum created: dist/$(PACKAGE_NAME).sha256"
+
+validate-binary: $(BINDIR_TARGET)/$(TARGET)
+	@echo "=== Validating binary ==="
+	@echo "File: $(BINDIR_TARGET)/$(TARGET)"
+	@echo "Size: $$(du -h $(BINDIR_TARGET)/$(TARGET) | cut -f1)"
+	@file $(BINDIR_TARGET)/$(TARGET)
+	@echo "Testing functionality..."
+	@$(BINDIR_TARGET)/$(TARGET) --version
+	@$(BINDIR_TARGET)/$(TARGET) --help > /dev/null
+	@echo "✅ Binary validation passed!"
+
+# Build all platforms
+build-all-platforms:
+	@echo "Building all platform binaries..."
+	$(MAKE) clean
+	$(MAKE) linux-x86_64 PACKAGE_NAME=router-switch-linux-x86_64 package-with-checksum
+	$(MAKE) clean
+	$(MAKE) darwin-x86_64 PACKAGE_NAME=router-switch-darwin-x86_64 package-with-checksum
+	@echo "✅ All platform builds completed!"
+	@ls -la dist/
 
 # Show binary information
 info: $(BINDIR_TARGET)/$(TARGET)
@@ -177,6 +250,18 @@ help:
 	@echo "  test          - Run tests on current build"
 	@echo "  test-all      - Run tests on both versions"
 	@echo ""
+	@echo "Cross-Platform Targets:"
+	@echo "  linux-x86_64  - Build for Linux x86_64"
+	@echo "  linux-arm64   - Build for Linux ARM64 (cross-compile)"
+	@echo "  darwin-x86_64 - Build for macOS x86_64 (Intel)"
+	@echo "  darwin-arm64  - Build for macOS ARM64 (Apple Silicon)"
+	@echo ""
+	@echo "Packaging Targets:"
+	@echo "  package       - Package binary with custom name"
+	@echo "  package-with-checksum - Package binary with SHA256 checksum"
+	@echo "  validate-binary- Validate binary functionality"
+	@echo "  build-all-platforms - Build for all supported platforms"
+	@echo ""
 	@echo "Advanced Targets:"
 	@echo "  static-release- Build static binary for distribution"
 	@echo "  info          - Show binary information"
@@ -194,4 +279,4 @@ help:
 	@echo "  Debug:  $(BINDIR)/debug/$(TARGET)"
 	@echo "  Release: $(BINDIR)/release/$(TARGET)"
 
-.PHONY: all debug release build-all clean clean-debug clean-release install install-release install-debug uninstall test test-all linux-release macos-release static-release info compare dev prod help
+.PHONY: all debug release build-all clean clean-debug clean-release install install-release install-debug uninstall test test-all linux-x86_64 linux-arm64 darwin-x86_64 darwin-arm64 linux-release macos-release static-release package package-with-checksum validate-binary build-all-platforms info compare dev prod help

@@ -1,0 +1,253 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  detect-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-release: ${{ steps.version.outputs.is-release }}
+      release-name: ${{ steps.version.outputs.release-name }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Detect version
+      id: version
+      run: |
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          # Extract version from tag
+          VERSION=$(echo $GITHUB_REF | sed 's|refs/tags/||')
+          IS_RELEASE=true
+          RELEASE_NAME="Release $VERSION"
+        else
+          # Extract version from source code
+          VERSION=$(grep "router-switch v" src/cli.c | sed 's/.*v\([0-9.]*\).*/\1/')
+          # Add timestamp for pre-release
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          VERSION="${VERSION}-${TIMESTAMP}"
+          IS_RELEASE=false
+          RELEASE_NAME="Pre-release $VERSION"
+        fi
+
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "is-release=$IS_RELEASE" >> $GITHUB_OUTPUT
+        echo "release-name=$RELEASE_NAME" >> $GITHUB_OUTPUT
+        echo "Detected version: $VERSION"
+        echo "Is release: $IS_RELEASE"
+
+  build:
+    needs: detect-version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux builds
+          - os: ubuntu-latest
+            arch: x86-64
+            target: linux-x86_64
+            compiler: gcc
+            binary-name: router-switch-${{ needs.detect-version.outputs.version }}-linux-x86_64
+
+          - os: ubuntu-latest
+            arch: arm64
+            target: linux-arm64
+            compiler: aarch64-linux-gnu-gcc
+            binary-name: router-switch-${{ needs.detect-version.outputs.version }}-linux-arm64
+
+          # macOS builds
+          - os: macos-latest
+            arch: x86-64
+            target: darwin-x86_64
+            compiler: clang
+            binary-name: router-switch-${{ needs.detect-version.outputs.version }}-darwin-x86_64
+
+          - os: macos-latest
+            arch: arm64
+            target: darwin-arm64
+            compiler: clang
+            binary-name: router-switch-${{ needs.detect-version.outputs.version }}-darwin-arm64
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Cache cross-compilation tools
+      if: matrix.target == 'linux-arm64'
+      uses: actions/cache@v3
+      with:
+        path: /usr/bin/aarch64-linux-gnu-*
+        key: ${{ runner.os }}-aarch64-cross-compiler
+        restore-keys: |
+          ${{ runner.os }}-aarch64-cross-compiler-
+
+    - name: Set up cross-compilation (Linux ARM64)
+      if: matrix.target == 'linux-arm64'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-aarch64-linux-gnu
+
+    - name: Cache build artifacts
+      uses: actions/cache@v3
+      with:
+        path: |
+          obj/
+          bin/
+        key: ${{ matrix.target }}-build-${{ hashFiles('src/**', 'Makefile') }}
+        restore-keys: |
+          ${{ matrix.target }}-build-
+
+    - name: Build
+      run: |
+        VERSION="${{ needs.detect-version.outputs.version }}"
+
+        # Set build parameters based on target
+        case "${{ matrix.target }}" in
+          "linux-x86_64")
+            make release CC=gcc TARGET_OS=linux TARGET_ARCH=x86_64
+            ;;
+          "linux-arm64")
+            make release CC=aarch64-linux-gnu-gcc TARGET_OS=linux TARGET_ARCH=arm64 \
+              CFLAGS="-Wall -Wextra -std=c99 -O3 -DNDEBUG -flto -static"
+            ;;
+          "darwin-x86_64")
+            make release CC=clang TARGET_OS=darwin TARGET_ARCH=x86_64 \
+              CFLAGS="-Wall -Wextra -std=c99 -O3 -DNDEBUG -flto -target x86_64-apple-macos10.15"
+            ;;
+          "darwin-arm64")
+            make release CC=clang TARGET_OS=darwin TARGET_ARCH=arm64 \
+              CFLAGS="-Wall -Wextra -std=c99 -O3 -DNDEBUG -flto -target arm64-apple-macos11"
+            ;;
+        esac
+
+    - name: Test binary
+      run: |
+        if [ -f "bin/release/router-switch" ]; then
+          echo "Binary found, testing..."
+          ./bin/release/router-switch --version
+          ./bin/release/router-switch --help
+          echo "Binary test passed"
+        else
+          echo "Binary not found!"
+          ls -la bin/ || true
+          exit 1
+        fi
+
+    - name: Package binary
+      run: |
+        mkdir -p dist
+        cp bin/release/router-switch "dist/${{ matrix.binary-name }}"
+        chmod +x "dist/${{ matrix.binary-name }}"
+
+        # Generate checksum
+        cd dist
+        sha256sum "${{ matrix.binary-name }}" > "${{ matrix.binary-name }}.sha256"
+        cd ..
+
+        echo "Packaged binary: dist/${{ matrix.binary-name }}"
+        echo "Checksum: dist/${{ matrix.binary-name }}.sha256"
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.target }}-build
+        path: |
+          dist/${{ matrix.binary-name }}
+          dist/${{ matrix.binary-name }}.sha256
+        retention-days: 30
+
+  create-release:
+    needs: [detect-version, build]
+    runs-on: ubuntu-latest
+    if: always() && needs.build.result == 'success'
+
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Prepare release assets
+      run: |
+        mkdir -p release-assets
+        find artifacts -name "router-switch-*" -type f -exec cp {} release-assets/ \;
+        find artifacts -name "*.sha256" -type f -exec cp {} release-assets/ \;
+
+        # Create combined checksums file
+        cd release-assets
+        sha256sum router-switch-* > checksums.txt
+        ls -la
+        cd ..
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: ${{ needs.detect-version.outputs.release-name }}
+        tag_name: ${{ needs.detect-version.outputs.version }}
+        prerelease: ${{ needs.detect-version.outputs.is-release == 'false' }}
+        draft: false
+        files: |
+          release-assets/*
+        body: |
+          ## RouterSwitch ${{ needs.detect-version.outputs.version }}
+
+          ### 📦 Downloads
+
+          Select the appropriate binary for your platform:
+
+          | Platform | Architecture | Binary |
+          |----------|-------------|---------|
+          | Linux | x86-64 | `router-switch-${{ needs.detect-version.outputs.version }}-linux-x86_64` |
+          | Linux | ARM64 | `router-switch-${{ needs.detect-version.outputs.version }}-linux-arm64` |
+          | macOS | x86-64 | `router-switch-${{ needs.detect-version.outputs.version }}-darwin-x86_64` |
+          | macOS | ARM64 | `router-switch-${{ needs.detect-version.outputs.version }}-darwin-arm64` |
+
+          ### 🔐 Verification
+
+          Each binary file has an accompanying `.sha256` checksum file. You can verify the integrity of your download with:
+
+          ```bash
+          sha256sum -c router-switch-*.sha256
+          ```
+
+          Or verify the combined checksums:
+          ```bash
+          sha256sum -c checksums.txt
+          ```
+
+          ### 🚀 Installation
+
+          1. Download the appropriate binary for your platform
+          2. Make it executable: `chmod +x router-switch-*`
+          3. Move to your preferred location: `sudo mv router-switch-* /usr/local/bin/router-switch`
+
+          ### 📖 Usage
+
+          ```bash
+          # Show help
+          router-switch --help
+
+          # Switch to a provider
+          router-switch --provider deepseek --model deepseek-chat
+
+          # Show version
+          router-switch --version
+          ```
+
+          ---
+
+          ${{ needs.detect-version.outputs.is-release == 'false' && '🚧 This is a pre-release. Use with caution.' || '' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

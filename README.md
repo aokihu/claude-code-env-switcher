@@ -19,9 +19,27 @@ RouterSwitch allows you to easily switch between different AI providers (like De
 
 ### Installation
 
+#### Option 1: Download Pre-built Binary (Recommended)
+
+1. Go to the [Releases page](https://github.com/aokihu/claude-code-env-switcher/releases)
+2. Download the appropriate binary for your platform:
+   - **Linux x86-64**: `router-switch-v*-linux-x86_64`
+   - **Linux ARM64**: `router-switch-v*-linux-arm64`
+   - **macOS x86-64 (Intel)**: `router-switch-v*-darwin-x86_64`
+   - **macOS ARM64 (Apple Silicon)**: `router-switch-v*-darwin-arm64`
+3. Verify the download with the provided checksum
+4. Make it executable and install:
+
 ```bash
-# Build from source
-git clone <repository-url>
+# Example for Linux x86-64
+chmod +x router-switch-v*-linux-x86_64
+sudo mv router-switch-v*-linux-x86_64 /usr/local/bin/router-switch
+```
+
+#### Option 2: Build from Source
+
+```bash
+git clone https://github.com/aokihu/claude-code-env-switcher.git
 cd RouterSwitch
 
 # Build release version (recommended)
@@ -32,6 +50,18 @@ make build-all
 
 # Install release version system-wide (optional)
 sudo make install-release
+```
+
+#### Cross-Platform Building
+
+```bash
+# Build for specific platforms
+make linux-x86_64    # Linux x86_64
+make darwin-x86_64   # macOS Intel
+make darwin-arm64    # macOS Apple Silicon
+
+# Package with checksums
+make package-with-checksum PACKAGE_NAME=router-switch-custom
 ```
 
 ### Basic Usage
@@ -235,6 +265,30 @@ make clean
 
 - Debug version: `bin/debug/router-switch`
 - Release version: `bin/release/router-switch`
+
+## Automated Builds
+
+This project uses GitHub Actions for automated building and releases:
+
+### 🚀 Continuous Integration
+- **Triggers**: Push to `main` branch or Git tags
+- **Platforms**: Linux (x86-64, ARM64) and macOS (Intel, Apple Silicon)
+- **Build Types**: Optimized release binaries with full validation
+- **Artifacts**: Pre-compiled binaries with SHA256 checksums
+
+### 📦 Release Process
+- **Pre-releases**: Automatically created on every push to `main`
+- **Official releases**: Created when Git tags are pushed
+- **Assets**: All platform binaries and checksum files
+- **Verification**: Each binary is tested before release
+
+### 🔧 Build Matrix
+| Runner | Architecture | Target | Compiler |
+|--------|-------------|---------|----------|
+| ubuntu-latest | x86-64 | linux-x86_64 | gcc |
+| ubuntu-latest | ARM64 | linux-arm64 | aarch64-linux-gnu-gcc |
+| macos-latest | x86-64 | darwin-x86_64 | clang |
+| macos-latest | ARM64 | darwin-arm64 | clang |
 
 ## Troubleshooting
 
