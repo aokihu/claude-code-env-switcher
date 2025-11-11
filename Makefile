@@ -1,7 +1,12 @@
 # RouterSwitch Makefile
 # Compiles RouterSwitch CLI tool from C source
 
-CC = gcc
+# Use clang on macOS for better cross-compilation support
+ifeq ($(shell uname -s),Darwin)
+    CC = clang
+else
+    CC = gcc
+endif
 TARGET = router-switch
 SRCDIR = src
 BINDIR = bin
@@ -47,6 +52,11 @@ else ifeq ($(TARGET_ARCH),arm64)
     else ifeq ($(TARGET_OS),darwin)
         ARCH_FLAGS = -target arm64-apple-macos11
     endif
+else
+    # Default architecture detection for macOS
+    ifeq ($(TARGET_OS),darwin)
+        ARCH_FLAGS = -target $(shell uname -m)-apple-macos$(shell sw_vers -productVersion | cut -d. -f1,2)
+    endif
 endif
 
 # Final CFLAGS
@@ -68,7 +78,7 @@ $(BINDIR_TARGET):
 # Create target binary
 $(BINDIR_TARGET)/$(TARGET): $(OBJECTS) | $(BINDIR_TARGET)
 	@echo "Linking $(TARGET) ($(BUILD_TYPE))..."
-	$(CC) $(OBJECTS) -o $@
+	$(CC) $(CFLAGS) $(OBJECTS) -o $@
 	@echo "Stripping debug symbols..."
 	$(STRIP_CMD)
 	@echo "Built $(TARGET) ($(BUILD_TYPE)) successfully!"
