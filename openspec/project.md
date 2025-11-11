@@ -72,25 +72,26 @@
 - *models* 的数组长度如果为*0*,那么就不用设置模型的环境变量
 - *env* 是用户设定的其他的环境变量,**key**就是环境变量名,**value**就是环境变量的值
 
-### 设置环境变量的流程 (v2.0)
+### 设置环境变量的流程 (v3.0)
 
 1. 从环境变量中读取*ROUTERSWITCH_CURRENT_PROVIDER*
-2. 根据当前的AI供应商, 使用`unsetenv()`清除对应的环境变量,包括*env*中的环境变量
+2. 根据当前的AI供应商, 输出`unset`命令清除对应的环境变量,包括*env*中的环境变量
 3. 根据命令行参数验证AI供应商和模型
-4. 使用`setenv()`直接设置新的AI供应商和模型环境变量
+4. 输出`export`命令设置新的AI供应商和模型环境变量
   4.1 *base_url* 转化成环境变量 *ANTHROPIC_BASE_URL*
   4.2 *api_key* 转换成环境量 *ANTHROPIC_AUTH_TOKEN*
-  4.3 如果*models*数组是空, 则不设置*ANTHROPIC_MODEL*
+  4.3 如果*models*数组是空, 则不输出*ANTHROPIC_MODEL*
   4.4 如果*models*数组不为空, 并且用户没有设置模型, 则*models*数组中第一个模型设置为*ANTHROPIC_MODEL*, 如果用户设置了模型, 并且与*models*中的模型匹配则设置为用户指定的模型
-  4.5 *env* 存在并且不为空的情况下, 直接按照**key**:**value**的形式设置环境变量
-5. 使用`setenv()`更新环境变量*ROUTERSWITCH_CURRENT_PROVIDER*,设置为当前用户设定的AI供应商
-6. 输出成功/失败消息给用户, 不再输出shell命令
+  4.5 *env* 存在并且不为空的情况下, 按照**key**:**value**的形式输出环境变量设置命令
+5. 输出`export`命令更新环境变量*ROUTERSWITCH_CURRENT_PROVIDER*,设置为当前用户设定的AI供应商
+6. 所有环境变量设置命令输出到stdout, 错误信息输出到stderr
 
-### 重要变更 (v2.0)
-- **破坏性变更**: 不再输出shell命令, 直接使用`setenv()`/`unsetenv()`设置环境变量
-- 用户使用方式从`eval $(router-switch ...)`改为`router-switch ...`
-- 环境变量在子进程中继承, 但不影响父shell环境
-- 提供详细的操作反馈信息
+### 重要变更 (v3.0)
+- **破坏性变更**: 恢复输出shell命令, 不再直接使用`setenv()`/`unsetenv()`设置环境变量
+- 用户使用方式需要使用`eval $(router-switch ...)`或`source <(router-switch ...)`
+- 提供`--install`/-i选项生成shell包装函数, 简化使用方式
+- 环境变量通过shell命令在当前shell中设置, 持久生效
+- 自动转义shell特殊字符
 
 ## Important Constraints
 [List any technical, business, or regulatory constraints]

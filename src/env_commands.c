@@ -1,112 +1,80 @@
 #include "router-switch.h"
 #include <errno.h>
 
-// Task 1.1: Create set_environment_variable() function with error handling
-static int set_environment_variable(const char *name, const char *value, EnvOperationResult *result) {
-    if (!name || !value || !result) {
-        return 0; // Invalid parameters
+// Shell escaping utility function
+static char* shell_escape(const char* value) {
+    if (!value) return NULL;
+
+    // Check if value needs escaping
+    int needs_escape = 0;
+    for (const char* p = value; *p; p++) {
+        if (*p == '\'' || *p == '"' || *p == '$' || *p == '`' ||
+            *p == '\\' || *p == '\n' || *p == '\t' || *p == ' ' ||
+            *p == '(' || *p == ')' || *p == '[' || *p == ']' ||
+            *p == '{' || *p == '}' || *p == '|' || *p == '&' ||
+            *p == ';' || *p == '<' || *p == '>' || *p == '!' ||
+            *p == '*' || *p == '?' || *p == '#') {
+            needs_escape = 1;
+            break;
+        }
     }
 
-    // Validate environment variable name
-    if (strlen(name) == 0 || strlen(name) >= MAX_ENV_VAR_NAME) {
-        snprintf(result->operations[result->operation_count].error_message,
-                sizeof(result->operations[result->operation_count].error_message),
-                "Invalid environment variable name: %s", name);
-        result->operations[result->operation_count].success = 0;
-        strncpy(result->operations[result->operation_count].var_name, name, MAX_ENV_VAR_NAME - 1);
-        result->operation_count++;
-        result->failure_count++;
-        return 0;
+    if (!needs_escape) {
+        return strdup(value);
     }
 
-    // Validate environment variable value
-    if (strlen(value) >= MAX_ENV_VAR_VALUE) {
-        snprintf(result->operations[result->operation_count].error_message,
-                sizeof(result->operations[result->operation_count].error_message),
-                "Environment variable value too long for: %s", name);
-        result->operations[result->operation_count].success = 0;
-        strncpy(result->operations[result->operation_count].var_name, name, MAX_ENV_VAR_NAME - 1);
-        result->operation_count++;
-        result->failure_count++;
-        return 0;
+    // Count single quotes to determine buffer size
+    int quote_count = 0;
+    for (const char* p = value; *p; p++) {
+        if (*p == '\'') quote_count++;
     }
 
-    // Set the environment variable
-    int set_result = setenv(name, value, 1); // 1 = overwrite existing
-    if (set_result == 0) {
-        // Success
-        result->operations[result->operation_count].success = 1;
-        strncpy(result->operations[result->operation_count].var_name, name, MAX_ENV_VAR_NAME - 1);
-        strncpy(result->operations[result->operation_count].var_value, value, MAX_ENV_VAR_VALUE - 1);
-        result->operations[result->operation_count].error_message[0] = '\0';
-        result->operation_count++;
-        result->success_count++;
-        return 1;
-    } else {
-        // Failure
-        snprintf(result->operations[result->operation_count].error_message,
-                sizeof(result->operations[result->operation_count].error_message),
-                "Failed to set environment variable %s (errno: %d)", name, errno);
-        result->operations[result->operation_count].success = 0;
-        strncpy(result->operations[result->operation_count].var_name, name, MAX_ENV_VAR_NAME - 1);
-        result->operation_count++;
-        result->failure_count++;
-        return 0;
+    // Allocate buffer for escaped string
+    char* escaped = malloc(strlen(value) + quote_count * 4 + 3); // +3 for leading/trailing quotes
+    if (!escaped) return NULL;
+
+    char* dest = escaped;
+    *dest++ = '\'';
+
+    for (const char* src = value; *src; src++) {
+        if (*src == '\'') {
+            // Close quote, add escaped quote, reopen quote
+            *dest++ = '\'';
+            *dest++ = '"';
+            *dest++ = '\'';
+            *dest++ = '"';
+            *dest++ = '\'';
+        } else {
+            *dest++ = *src;
+        }
+    }
+
+    *dest++ = '\'';
+    *dest = '\0';
+
+    return escaped;
+}
+
+// Print export command for environment variable
+static void print_export_command(const char* name, const char* value) {
+    if (!name || !value) return;
+
+    char* escaped_value = shell_escape(value);
+    if (escaped_value) {
+        printf("export %s=%s\n", name, escaped_value);
+        free(escaped_value);
     }
 }
 
-// Task 1.2: Implement unset_environment_variable() function with error handling
-static int unset_environment_variable(const char *name, EnvOperationResult *result) {
-    if (!name || !result) {
-        return 0; // Invalid parameters
-    }
-
-    // Validate environment variable name
-    if (strlen(name) == 0 || strlen(name) >= MAX_ENV_VAR_NAME) {
-        snprintf(result->operations[result->operation_count].error_message,
-                sizeof(result->operations[result->operation_count].error_message),
-                "Invalid environment variable name: %s", name);
-        result->operations[result->operation_count].success = 0;
-        strncpy(result->operations[result->operation_count].var_name, name, MAX_ENV_VAR_NAME - 1);
-        result->operation_count++;
-        result->failure_count++;
-        return 0;
-    }
-
-    // Store the current value before unsetting (for reporting)
-    char *current_value = getenv(name);
-    if (current_value) {
-        strncpy(result->operations[result->operation_count].var_value, current_value, MAX_ENV_VAR_VALUE - 1);
-    } else {
-        result->operations[result->operation_count].var_value[0] = '\0';
-    }
-
-    // Unset the environment variable
-    int unset_result = unsetenv(name);
-    if (unset_result == 0) {
-        // Success
-        result->operations[result->operation_count].success = 1;
-        strncpy(result->operations[result->operation_count].var_name, name, MAX_ENV_VAR_NAME - 1);
-        result->operations[result->operation_count].error_message[0] = '\0';
-        result->operation_count++;
-        result->success_count++;
-        return 1;
-    } else {
-        // Failure
-        snprintf(result->operations[result->operation_count].error_message,
-                sizeof(result->operations[result->operation_count].error_message),
-                "Failed to unset environment variable %s (errno: %d)", name, errno);
-        result->operations[result->operation_count].success = 0;
-        strncpy(result->operations[result->operation_count].var_name, name, MAX_ENV_VAR_NAME - 1);
-        result->operation_count++;
-        result->failure_count++;
-        return 0;
-    }
+// Print unset command for environment variable
+static void print_unset_command(const char* name) {
+    if (!name) return;
+    printf("unset %s\n", name);
 }
 
-// Task 1.3: Create clear_provider_environment() function for bulk clearing
-int clear_provider_environment(const Config *config, const char *provider_name, EnvOperationResult *result) {
-    if (!config || !provider_name || !result) {
+// Clear provider environment by outputting unset commands
+int clear_provider_environment(const Config *config, const char *provider_name) {
+    if (!config || !provider_name) {
         return 0;
     }
 
@@ -115,28 +83,25 @@ int clear_provider_environment(const Config *config, const char *provider_name, 
         return 0; // Provider not found
     }
 
-    // Initialize result tracking
-    memset(result, 0, sizeof(EnvOperationResult));
+    // Always unset standard Anthropic environment variables
+    print_unset_command("ANTHROPIC_BASE_URL");
+    print_unset_command("ANTHROPIC_AUTH_TOKEN");
+    print_unset_command("ANTHROPIC_MODEL");
 
-    // Always clear standard Anthropic environment variables
-    unset_environment_variable("ANTHROPIC_BASE_URL", result);
-    unset_environment_variable("ANTHROPIC_AUTH_TOKEN", result);
-    unset_environment_variable("ANTHROPIC_MODEL", result);
-
-    // Clear custom environment variables from provider config
+    // Unset custom environment variables from provider config
     for (int i = 0; i < provider->env_count; i++) {
-        unset_environment_variable(provider->env_names[i], result);
+        print_unset_command(provider->env_names[i]);
     }
 
     // Clear current provider tracking
-    unset_environment_variable("ROUTERSWITCH_CURRENT_PROVIDER", result);
+    print_unset_command("ROUTERSWITCH_CURRENT_PROVIDER");
 
-    return (result->success_count > 0);
+    return 1;
 }
 
-// Task 1.4: Create apply_provider_environment() function for bulk setting
-int apply_provider_environment(const Config *config, const char *provider_name, const char *model_name, EnvOperationResult *result) {
-    if (!config || !provider_name || !result) {
+// Apply provider environment by outputting export commands
+int apply_provider_environment(const Config *config, const char *provider_name, const char *model_name) {
+    if (!config || !provider_name) {
         return 0;
     }
 
@@ -146,12 +111,9 @@ int apply_provider_environment(const Config *config, const char *provider_name, 
         return 0;
     }
 
-    // Initialize result tracking
-    memset(result, 0, sizeof(EnvOperationResult));
-
     // Set provider base configuration
-    set_environment_variable("ANTHROPIC_BASE_URL", provider->base_url, result);
-    set_environment_variable("ANTHROPIC_AUTH_TOKEN", provider->api_key, result);
+    print_export_command("ANTHROPIC_BASE_URL", provider->base_url);
+    print_export_command("ANTHROPIC_AUTH_TOKEN", provider->api_key);
 
     // Set model if applicable
     if (provider->model_count > 0) {
@@ -176,55 +138,137 @@ int apply_provider_environment(const Config *config, const char *provider_name, 
             selected_model = provider->models[0];
         }
 
-        set_environment_variable("ANTHROPIC_MODEL", selected_model, result);
+        print_export_command("ANTHROPIC_MODEL", selected_model);
     }
 
     // Set custom environment variables
     for (int i = 0; i < provider->env_count; i++) {
-        set_environment_variable(provider->env_names[i], provider->env_values[i], result);
+        print_export_command(provider->env_names[i], provider->env_values[i]);
     }
 
     // Update current provider tracking
-    set_environment_variable("ROUTERSWITCH_CURRENT_PROVIDER", provider_name, result);
+    print_export_command("ROUTERSWITCH_CURRENT_PROVIDER", provider_name);
 
-    return (result->success_count > 0);
+    return 1;
 }
 
-// Task 1.5: Add environment operation success/failure tracking (implemented in above functions)
+// Print shell wrapper function for installation
+void print_shell_wrapper(const Config *config) {
+    printf("# Shell wrapper function for router-switch\n");
+    printf("# Add this to your ~/.zshrc, ~/.bashrc, or ~/.bash_profile\n\n");
 
-// Task 3.2: Implement success message formatting for environment changes
-void print_environment_operations_result(const EnvOperationResult *result, const char *operation_type, int verbose) {
-    if (!result || !operation_type) {
-        return;
-    }
+    printf("router-switch() {\n");
+    printf("    # Path to router-switch binary (adjust if needed)\n");
+    printf("    local ROUTER_SWITCH_CMD=\"${ROUTER_SWITCH_BIN:-$(dirname \"${BASH_SOURCE[0]:-${(%):-%x}}\")/bin/release/router-switch}\"\n\n");
 
-    // Always show error messages regardless of verbose setting
-    if (result->failure_count > 0) {
-        fprintf(stderr, "Failed to %s environment variables:\n", operation_type);
-        for (int i = 0; i < result->operation_count; i++) {
-            if (!result->operations[i].success) {
-                fprintf(stderr, "  %s: %s\n", result->operations[i].var_name, result->operations[i].error_message);
-            }
-        }
-    }
+    printf("    # If no arguments, show help\n");
+    printf("    if [ $# -eq 0 ]; then\n");
+    printf("        echo \"Usage: router-switch <provider> [model] [options]\"\n");
+    printf("        echo \"  provider: AI provider name (e.g., deepseek, glm");
 
-    // Only show success messages in verbose mode
-    if (verbose && result->success_count > 0) {
-        printf("Successfully %s environment variables:\n", operation_type);
-        for (int i = 0; i < result->operation_count; i++) {
-            if (result->operations[i].success) {
-                if (strlen(result->operations[i].var_value) > 0) {
-                    printf("  Set %s to %s\n", result->operations[i].var_name, result->operations[i].var_value);
-                } else {
-                    printf("  Unset %s", result->operations[i].var_name);
-                    if (strlen(result->operations[i].var_value) > 0) {
-                        printf(" (was: %s)", result->operations[i].var_value);
-                    }
-                    printf("\n");
-                }
-            }
-        }
+    // Add provider names from config
+    for (int i = 0; i < config->provider_count; i++) {
+        printf(", %s", config->providers[i].name);
     }
+    printf(")\"\n");
+
+    printf("        echo \"  model: Optional model name\"\n");
+    printf("        echo \"  options: Additional options passed to router-switch\"\n");
+    printf("        echo \"\"\n");
+    printf("        echo \"Examples:\"\n");
+    printf("        echo \"  router-switch deepseek\"\n");
+    printf("        echo \"  router-switch deepseek deepseek-chat\"\n");
+    printf("        echo \"  router-switch -v glm\"\n");
+    printf("        return 1\n");
+    printf("    fi\n\n");
+
+    printf("    # If --install flag, pass through to actual binary\n");
+    printf("    if [ \"$1\" = \"--install\" ] || [ \"$1\" = \"-i\" ]; then\n");
+    printf("        \"$ROUTER_SWITCH_CMD\" \"$@\"\n");
+    printf("        return $?\n");
+    printf("    fi\n\n");
+
+    printf("    # Parse arguments\n");
+    printf("    local args=()\n");
+    printf("    local provider=\"\"\n");
+    printf("    local model=\"\"\n");
+    printf("    local has_provider_flag=false\n");
+    printf("    local has_model_flag=false\n\n");
+
+    printf("    # Check if provider flag is already used\n");
+    printf("    for arg in \"$@\"; do\n");
+    printf("        case $arg in\n");
+    printf("            -p|--provider)\n");
+    printf("                has_provider_flag=true\n");
+    printf("                ;;\n");
+    printf("            -m|--model)\n");
+    printf("                has_model_flag=true\n");
+    printf("                ;;\n");
+    printf("        esac\n");
+    printf("    done\n\n");
+
+    printf("    # Build command arguments\n");
+    printf("    if [ \"$has_provider_flag\" = false ]; then\n");
+    printf("        # First argument is provider\n");
+    printf("        provider=\"$1\"\n");
+    printf("        args+=(-p \"$provider\")\n");
+    printf("        shift\n");
+    printf("    fi\n\n");
+
+    printf("    if [ \"$has_model_flag\" = false ] && [ $# -gt 0 ] && [[ ! \"$1\" =~ ^- ]]; then\n");
+    printf("        # Next argument is model (if it doesn't start with -)\n");
+    printf("        model=\"$1\"\n");
+    printf("        args+=(-m \"$model\")\n");
+    printf("        shift\n");
+    printf("    fi\n\n");
+
+    printf("    # Add remaining arguments\n");
+    printf("    args+=(\"$@\")\n\n");
+
+    printf("    # Execute router-switch with eval\n");
+    printf("    eval \"$(\"$ROUTER_SWITCH_CMD\" \"${args[@]}\")\"\n");
+    printf("}\n\n");
+
+    // Tab completion for zsh
+    printf("# Tab completion for zsh\n");
+    printf("if command -v compdef >/dev/null 2>&1; then\n");
+    printf("    _router-switch() {\n");
+    printf("        local -a providers\n");
+    printf("        providers=(");
+
+    for (int i = 0; i < config->provider_count; i++) {
+        printf("%s ", config->providers[i].name);
+    }
+    printf(")\n\n");
+
+    printf("        if [[ $CURRENT -eq 2 ]]; then\n");
+    printf("            _describe 'providers' providers\n");
+    printf("        fi\n");
+    printf("    }\n");
+    printf("    compdef _router-switch router-switch\n");
+    printf("fi\n\n");
+
+    // Tab completion for bash
+    printf("# Tab completion for bash\n");
+    printf("if command -v complete >/dev/null 2>&1; then\n");
+    printf("    _router_switch_bash() {\n");
+    printf("        local providers=\"");
+
+    for (int i = 0; i < config->provider_count; i++) {
+        if (i > 0) printf(" ");
+        printf("%s", config->providers[i].name);
+    }
+    printf("\"\n");
+    printf("        local cur=${COMP_WORDS[COMP_CWORD]}\n\n");
+    printf("        if [ $COMP_CWORD -eq 1 ]; then\n");
+    printf("            COMPREPLY=($(compgen -W \"$providers\" -- \"$cur\"))\n");
+    printf("        fi\n");
+    printf("    }\n");
+    printf("    complete -F _router_switch_bash router-switch\n");
+    printf("fi\n\n");
+
+    printf("# To enable the wrapper, reload your shell or run:\n");
+    printf("# source ~/.zshrc  # or ~/.bashrc\n");
 }
 
 char* get_current_provider(void) {

@@ -44,6 +44,7 @@ typedef struct {
     int help;
     int version;
     int verbose;
+    int install;
 } CliOptions;
 
 // Function declarations
@@ -62,25 +63,10 @@ void display_help(void);
 void display_version(void);
 
 // env_commands.c
-// Forward declarations for environment operation tracking
-typedef struct {
-    char var_name[MAX_ENV_VAR_NAME];
-    char var_value[MAX_ENV_VAR_VALUE];
-    int success;
-    char error_message[256];
-} EnvOperation;
-
-typedef struct {
-    EnvOperation operations[MAX_PROVIDERS * 3];
-    int operation_count;
-    int success_count;
-    int failure_count;
-} EnvOperationResult;
-
-// New environment management functions
-int clear_provider_environment(const Config *config, const char *provider_name, EnvOperationResult *result);
-int apply_provider_environment(const Config *config, const char *provider_name, const char *model_name, EnvOperationResult *result);
-void print_environment_operations_result(const EnvOperationResult *result, const char *operation_type, int verbose);
+// Environment management functions
+int clear_provider_environment(const Config *config, const char *provider_name);
+int apply_provider_environment(const Config *config, const char *provider_name, const char *model_name);
+void print_shell_wrapper(const Config *config);
 char* get_current_provider(void);
 
 // json_parser.c
