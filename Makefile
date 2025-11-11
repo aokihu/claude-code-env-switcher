@@ -24,7 +24,12 @@ else ifeq ($(BUILD_TYPE),release)
     OBJDIR = obj/release
     BINDIR_TARGET = $(BINDIR)/release
     BASE_CFLAGS = -Wall -Wextra -std=c99 -O3 -DNDEBUG -flto
-    STRIP_CMD = strip $(BINDIR_TARGET)/$(TARGET)
+    # Use appropriate strip command based on target
+    ifeq ($(TARGET_OS)-$(TARGET_ARCH),linux-arm64)
+        STRIP_CMD = aarch64-linux-gnu-strip $(BINDIR_TARGET)/$(TARGET) || echo "Cross-compile strip failed, keeping symbols"
+    else
+        STRIP_CMD = strip $(BINDIR_TARGET)/$(TARGET) || echo "Strip failed, keeping symbols"
+    endif
 else
     $(error Invalid BUILD_TYPE. Use 'debug' or 'release')
 endif
